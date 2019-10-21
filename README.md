@@ -1,4 +1,8 @@
 # CyTOF-Randomization
-Code for reproducing results for the paper "Challenges in the multivariate analysis of mass cytometry data: the effect of randomization."
+R code used in paper "Challenges in the multivariate analysis of mass cytometry data: the effect of randomization."
 
-These code files can be used the results shown in Figures 2, 4 and 5. For Figure 3 (SPADE) we used the matlab application of deterministic SPADE (with default parameters) which can be found here: http://pengqiu.gatech.edu/software/SPADE/
+* [DimRedPheno.r](https://github.com/giopap/CyTOF-Randomization/blob/master/RandomizationPaperCode.r) : this file contains code for reproducing the results shown in Figures 2 and 4 that is, on Dimensionality Reduction (PCA, JIVE, MDS, tSNE) and Cell phenotyping (ensemble clustering)
+
+* [Network.r](https://github.com/giopap/CyTOF-Randomization/blob/master/network.r) : this file contains code for reproducing the results shown in Figure 5 and table 1 on network reconstruction analysis (gLASSO, rFCI, RNs)
+
+* For Figure 3 (SPADE results) we used the matlab application of deterministic SPADE (with default parameters, see text) which can be found here: http://pengqiu.gatech.edu/software/SPADE/

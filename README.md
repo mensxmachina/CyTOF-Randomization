@@ -1,7 +1,7 @@
 # CyTOF-Randomization
 R code used in paper "Challenges in the multivariate analysis of mass cytometry data: the effect of randomization."
 
-* [DimRedPheno.r](https://github.com/giopap/CyTOF-Randomization/blob/master/RandomizationPaperCode.r) : this file contains code for reproducing the results shown in Figures 2 and 4 that is, on Dimensionality Reduction (PCA, JIVE, MDS, tSNE) and Cell phenotyping (ensemble clustering)
+* [DimRed_Pheno.r](https://github.com/giopap/CyTOF-Randomization/blob/master/DimRed_Pheno.r) : this file contains code for reproducing the results shown in Figures 2 and 4 that is, on Dimensionality Reduction (PCA, JIVE, MDS, tSNE) and Cell phenotyping (ensemble clustering)
 
 * [Network.r](https://github.com/giopap/CyTOF-Randomization/blob/master/network.r) : this file contains code for reproducing the results shown in Figure 5 and table 1 on network reconstruction analysis (gLASSO, rFCI, RNs)
 

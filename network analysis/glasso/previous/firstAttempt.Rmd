@@ -1,0 +1,209 @@
+---
+title: "Reconstructing network in randomized vs non-randomized data"
+output:
+  html_document: default
+---
+
+## Intro
+
+First attempt in analyzing the effect of randomization on network reconstruction. We start studying what happens to the correlation matrix and then what happens to the output of methods based on partial correlations 
+
+## Starting the analysis
+
+Let's set up the analysis:
+
+```{r, warning=FALSE, results='hide', message=FALSE}
+
+#cleaning memory
+rm(list =ls())
+
+#set seed
+set.seed(12345)
+
+#libraries
+if(!require(flowCore)){
+  install.packages('flowcore')
+  require(flowCore)
+}
+if(!require(huge)){
+  install.packages('huge')
+  require(huge)
+}
+
+#number of samples to select randomly; set to NA to retain all samples
+nSamples <- NA
+
+#actual names
+aNames <- read.csv('../../Data/markers.csv', header = TRUE, stringsAsFactors = FALSE)
+aNames$CytkPanel <- NULL; #this is a phos panel
+
+#columns to eliminate
+#toEliminate <- c('Time', 'Event_length', 'Pd102Di', 'Pd104Di', 'Pd105Di', 'Pd106Di', 'Pd108Di', 'Pd110Di', 'Ce140Di', 'Ir191Di', 'Ir193Di')
+markersToEliminate <- as.numeric(unlist(sapply(c("Barcode", "Time", "cell length", "unkn", "EQBeads", "DNA", "TCRab", "\\bCD4\\b", "ICOS", "CCR6", "CD57", "CD28"),grep, aNames$PhosPanel)))
+markersToKeep <- aNames$channel[setdiff(1:length(aNames$PhosPanel), markersToEliminate)]
+newMarkerNames <- aNames$PhosPanel[setdiff(1:length(aNames$PhosPanel), markersToEliminate)]
+
+# allMarkers <- read.csv(paste0(dataFolder,'markers.csv'),stringsAsFactors = F)
+
+##
+## Exclude non Marker and failed Marker variables
+##
+
+# nonMarkers.Cytk <- as.numeric(unlist(sapply(c("Barcode","Time","cell length","unkn","EQBeads","DNA"),grep, allMarkers$CytkPanel)))
+
+# failedMarkers <- as.numeric(unlist(sapply(c("TCRab", "\\bCD4\\b", "ICOS", "CCR6", "CD57", "CD28"),grep, allMarkers$PhosPanel)))
+
+```
+
+Let's load the non-randomized data. We eliminate the first two columns, "Time" and "Event_length", and we randomly select `r nSamples` samples
+
+
+```{r}
+
+#loading data
+nonRandom <- read.FCS('../../Data/gated data/2390__EXP-17-BY9239__internal__Donor A (Schmidt project)__Stim_2min_wo PI__1.fcs')
+
+#matrix of measurements
+nonRandom <- exprs(nonRandom)
+
+#eliminating columns related to technical measurements
+nonRandom <- nonRandom[ , markersToKeep]
+colnames(nonRandom) <- newMarkerNames;
+nVars <- dim(nonRandom)[2]
+
+# transforming with the arcsinh
+nonRandom <- asinh(nonRandom/5)
+
+#selecting a sub-sample
+if(!is.na(nSamples)){
+  zz = sample.int(dim(nonRandom)[1], nSamples)
+  nonRandom <- nonRandom[zz, ]
+}
+
+```
+
+We perform the first steps also for the randomized data, taking care of selecting the same sub-sample we selected for the non-randomized ones
+
+```{r}
+
+#reading data
+random <- read.FCS('../../Data/gated_randomized/2390__Donor A__Stim_2min_wo PI__1.fcs')
+
+#measurement matrix
+random <- exprs(random)
+
+#selecting columns and sub-sample
+random <- random[ , markersToKeep]
+colnames(random) <- newMarkerNames
+if(!is.na(nSamples)){
+  random <- random[zz, ]
+}
+
+```
+
+## Correlations matrices
+
+Let's compute the correlation matrices for both datasets and let's compare them.
+
+```{r}
+
+#correlation matrices
+nonRandomCor <- cor(nonRandom)
+randomCor <- cor(random)
+
+#difference between unique values (upper matrix excluding the diagonal)
+idx <- upper.tri(nonRandomCor, diag = FALSE)
+diffCor <- as.numeric(abs(nonRandomCor[idx] - randomCor[idx]))
+
+#exploring the difference
+summary(diffCor) 
+hist(diffCor)
+
+
+```
+
+We see that the difference is relatively low on average (`r round(mean(diffCor), 4)`), however there are some more massive differences (up to `r round(max(diffCor), 4)`)
+
+## Using glasso
+
+The funny part now! We use the Graphical Lasso method for computing a partial-correlation graph on the non-randomized data
+
+```{r, warning=FALSE, results='hide', message=FALSE}
+
+#applying the glasso method
+nonRandomRes <- huge(nonRandom, method = 'glasso')
+nonRandomRes <- huge.select(nonRandomRes)
+nonRandomGraph <- as.matrix(nonRandomRes$refit)
+
+```
+
+```{r}
+
+#plotting the results
+plot(nonRandomRes)
+
+```
+
+We do the same on the randomized data
+
+```{r, warning=FALSE, results='hide', message=FALSE}
+
+#applying the glasso method
+randomRes <- huge(random, method = 'glasso')
+randomRes <- huge.select(randomRes)
+randomGraph <- as.matrix(randomRes$refit)
+
+```
+
+```{r}
+
+#plotting the results
+plot(randomRes)
+
+```
+
+And now we compare the two outputs. The network on the non-randomized data has `r sum(nonRandomGraph)` edges, while other network has `r sum(randomGraph)` edges, for a total difference of `r sum(abs(nonRandomGraph - randomGraph))`. Let's dissect this difference even more:
+
+Number of edges in the non-randomized data network that are not in the other network: `r sum(randomGraph == 0 & nonRandomGraph == 1)`
+
+Number of edges in the randomized data network that are not in the other network: `r sum(randomGraph == 1 & nonRandomGraph == 0)`
+
+Question: do these differences correspond to correlations greatly altered by the randomization?
+
+```{r}
+
+#selecting the differences corresponding to changes in the graphs
+selectedDiffCor <- diffCor[nonRandomGraph[idx] != randomGraph[idx]]
+
+#selecting the differences corresponding to edges that are identical in the two graphs
+otherDiffCor <- diffCor[nonRandomGraph[idx] == randomGraph[idx]]
+
+#t test
+t.test(x = selectedDiffCor, y = otherDiffCor)
+
+```
+
+Indeed, the differences in the graphs corresponds to cells in the correlation matrices particularly affected by the randomization.
+
+## Using glasso with a fixed lambda
+
+There could be the case that the number of differences in the graph is inflated by a different choice of the hyper-parameter lambda. Indeed, for the non-randomized data the `huge.select()` function indicates `r round(nonRandomRes$opt.lambda, 4)` as best lambda value, while `r round(randomRes$opt.lambda, 4)` is the best lambda value for the randomized dataset. We will now re-compute the graphs using an average lambda of `r round(mean(c(nonRandomRes$opt.lambda, randomRes$opt.lambda)), 4)`.
+
+```{r, warning=FALSE, results='hide', message=FALSE}
+
+#applying the glasso method with fixed lambda
+averageLambda <- mean(c(nonRandomRes$opt.lambda, randomRes$opt.lambda));
+nonRandomResFixed <- huge(nonRandom, method = 'glasso', lambda = averageLambda)
+nonRandomGraphFixed <- as.matrix(nonRandomResFixed$path[[1]])
+randomResFixed <- huge(random, method = 'glasso', lambda = averageLambda)
+randomGraphFixed <- as.matrix(randomResFixed$path[[1]])
+
+```
+
+And now we compare again the two outputs. The network on the non-randomized data has `r sum(nonRandomGraphFixed)` edges, while other network has `r sum(randomGraphFixed)` edges, for a total difference of `r sum(abs(nonRandomGraphFixed - randomGraphFixed))`. Let's dissect this difference even more:
+
+Number of edges in the non-randomized data network that are not in the other network: `r sum(randomGraphFixed == 0 & nonRandomGraphFixed == 1)`
+
+Number of edges in the randomized data network that are not in the other network: `r sum(randomGraphFixed == 1 & nonRandomGraphFixed == 0)`
+
+With the same lambda the differences are even more evident.

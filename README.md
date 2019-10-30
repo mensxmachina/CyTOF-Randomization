@@ -1,5 +1,5 @@
 # CyTOF-Randomization
-R code used in paper "Challenges in the multivariate analysis of mass cytometry data: the effect of randomization."
+R code used in paper "Challenges in the multivariate analysis of mass cytometry data: the effect of randomization.", Cytometry Part A, doi: [10.1002/cyto.a.23908](https://www.doi.org/10.1002/cyto.a.23908)
 
 * [Dimensionality Reduction and Phenotyping](https://github.com/giopap/CyTOF-Randomization/tree/master/dimensionality%20reduction%20and%20phenotyping) : folder contains code for reproducing the results shown in Figures 2 and 4 that is, on Dimensionality Reduction (PCA, JIVE, MDS, tSNE) and Cell phenotyping (ensemble clustering)
 
